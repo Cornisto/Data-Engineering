@@ -47,5 +47,5 @@ A star schema optimized for queries on song play analysis will be created using 
 
 ## Data pipeline
 Data flow in the process is presented on the graph below:
-<img src="images/pipeline-scheme.png">
+<img src="images/pipeline-scheme.PNG">
 
