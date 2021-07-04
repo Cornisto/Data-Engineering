@@ -39,9 +39,9 @@ A star schema optimized for queries on song play analysis will be created using 
     *user_id, first_name, last_name, gender, level*
 2) songs - songs in music database
     *song_id, title, artist_id, year, duration*
-3) artists - artists in music database
+4) artists - artists in music database
     *artist_id, name, location, lattitude, longitude*
-4) time - timestamps of records in songplays broken down into specific units
+6) time - timestamps of records in songplays broken down into specific units
     *start_time, hour, day, week, month, year, weekday*
 
 
