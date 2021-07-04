@@ -21,14 +21,15 @@ The data sources for our data lake are provided by two public S3 buckets:
 A star schema optimized for queries on song play analysis will be created using Spark. This includes the following tables:
 
 **Fact Table**
-1) songplays - records in log data associated with song plays i.e. records with page NextSong
+1) songplays - records in log data associated with song plays i.e. records with page NextSong  
     *songplay_id, start_time, user_id, level, song_id, artist_id, session_id, location, user_agent*
+    
 **Dimension Tables**
-1) users - users in the app
+1) users - users in the app  
     *user_id, first_name, last_name, gender, level*
-2) songs - songs in music database
+2) songs - songs in music database  
     *song_id, title, artist_id, year, duration*
-3) artists - artists in music database
+3) artists - artists in music database  
     *artist_id, name, location, lattitude, longitude*
-4) time - timestamps of records in songplays broken down into specific units
+4) time - timestamps of records in songplays broken down into specific units  
     *start_time, hour, day, week, month, year, weekday*
