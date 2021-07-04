@@ -11,25 +11,37 @@ class DataQualityOperator(BaseOperator):
     @apply_defaults
     def __init__(self,
                  redshift_conn_id="",
-                 tables=None,
+                 dq_checks=None,
                  *args, **kwargs):
 
         super(DataQualityOperator, self).__init__(*args, **kwargs)
         self.redshift_conn_id = redshift_conn_id
-        if tables == None:
-            self.tables = []
+        if dq_checks == None:
+            self.dq_checks = []
         else:
-            self.tables = tables
+            self.dq_checks = dq_checks
 
     def execute(self, context):
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
+        error_count = 0
+        failed_tests = []
         
-        for table in self.tables:
-            records = redshift.get_records(f"SELECT COUNT(*) FROM {table}")
+        for check in self.dq_checks:
+            records = redshift.get_records(check['check_sql'])
             if len(records) < 1 or len(records[0]) < 1:
-                raise ValueError(f"Data quality check failed. Table {table} returned no results")
+                error_count += 1
+                failed_tests.append(check['check_sql'])
+                failed_tests.append(f"Data quality check failed. Query {check['check_sql']} returned no results.")
+                continue
             num_records = records[0][0]
-            if num_records < 1:
-                raise ValueError(f"Data quality check failed. Table {table} contained 0 rows")
-            self.log.info(f"Data quality on table {table} check passed with {records[0][0]} records")
+            if num_records != check['expected_result']:
+                error_count += 1
+                failed_tests.append(f"Data quality check failed. Query {check['check_sql']} returned {num_records} records instead of {check['expected_result']}.")
+            
+        if error_count > 0:
+            self.log.info('Tests failed')
+            self.log.info(failed_tests)
+            raise ValueError('Data quality check failed.')
+        else:                  
+            self.log.info(f"Data quality check passed.")
             
