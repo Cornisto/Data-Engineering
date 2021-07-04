@@ -105,7 +105,18 @@ run_quality_checks = DataQualityOperator(
     task_id='Run_data_quality_checks',
     dag=dag,
     redshift_conn_id="redshift",
-    tables=['staging_events', 'staging_songs', 'songplays', 'users', 'songs', 'artists', 'time']
+    dq_checks=[
+        {'check_sql': 'SELECT EXISTS (SELECT 1 FROM songplays LIMIT 1)', 'expected_result': 1},
+        {'check_sql': 'SELECT EXISTS (SELECT 1 FROM users LIMIT 1)', 'expected_result': 1},
+        {'check_sql': 'SELECT EXISTS (SELECT 1 FROM songs LIMIT 1)', 'expected_result': 1},
+        {'check_sql': 'SELECT EXISTS (SELECT 1 FROM artists LIMIT 1)', 'expected_result': 1},
+        {'check_sql': 'SELECT EXISTS (SELECT 1 FROM time LIMIT 1)', 'expected_result': 1},
+        {'check_sql': 'SELECT COUNT(*) FROM songplays WHERE songid IS NULL', 'expected_result': 0},
+        {'check_sql': 'SELECT COUNT(*) FROM users WHERE first_name IS NULL', 'expected_result': 0},
+        {'check_sql': 'SELECT COUNT(*) FROM songs WHERE title IS NULL', 'expected_result': 0},
+        {'check_sql': 'SELECT COUNT(*) FROM artists WHERE name IS NULL', 'expected_result': 0},
+        {'check_sql': 'SELECT COUNT(*) FROM time WHERE month IS NULL', 'expected_result': 0}
+    ]
 )
 
 end_operator = DummyOperator(task_id='Stop_execution',  dag=dag)
