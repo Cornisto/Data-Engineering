@@ -30,4 +30,4 @@ class LoadFactOperator(BaseOperator):
         redshift.run(self.create_stmt)
         
         self.log.info(f"Inserting data into fact table {self.table}")
-        redshift.run(self.sql)
+        redshift.run(f"INSERT INTO {self.table} {self.sql}")
