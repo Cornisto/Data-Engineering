@@ -31,9 +31,9 @@ class LoadDimensionOperator(BaseOperator):
         self.log.info(f"Creating dimension table if not exists {self.table}")
         redshift.run(self.create_stmt)
         
-        if self.insert_mode == "delete-load":
+        if self.insert_mode == "truncate":
             self.log.info(f"Deleting data from dimension table {self.table}")
             redshift.run("TRUNCATE {};".format(self.table))
         
         self.log.info(f"Inserting data into dimension table {self.table}")
-        redshift.run(self.sql)
+        redshift.run(f"INSERT INTO {self.table} {self.sql}")
