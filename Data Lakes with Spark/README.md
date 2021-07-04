@@ -13,9 +13,10 @@ The data sources for our data lake are provided by two public S3 buckets:
 
 
 ## Files
-1) etl.py - Runs the ETL process to load data from S3, process it using Spark and load back to S3.
+1) etl.py - runs the ETL process to load data from S3, process it using Spark and load back to S3.
 2) dl.cfg - contains AWS credentials such as access key id and secret access key
-
+3) create_s3_bucket.py - creates Amazon S3 bucket with specified name and in specified region
+4) delete_s3_bucket.py - empties selected Amazon S3 bucket and then deletes the bucket
 
 ## Star Schema
 A star schema optimized for queries on song play analysis will be created using Spark. This includes the following tables:
