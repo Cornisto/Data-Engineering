@@ -1,28 +1,10 @@
+from airflow.contrib.hooks.aws_hook import AwsHook
 import logging
 import boto3
 from botocore.exceptions import ClientError
-import configparser
 
 
-def get_key_secret():
-    
-    """
-        Getting key and secret from the config file
-        
-        Returns: 
-            AWS Access key id, 
-            AWS secrety access key
-    """
-    
-    config = configparser.ConfigParser()
-    config.read('dl.cfg')
-
-    KEY = config['AWS_CREDENTIALS']['AWS_ACCESS_KEY_ID']
-    SECRET = config['AWS_CREDENTIALS']['AWS_SECRET_ACCESS_KEY']
-    return KEY, SECRET
-
-
-def create_bucket(bucket_name, KEY, SECRET, region=None):
+def create_bucket(bucket_name, region=None):
     """
         Create an S3 bucket in the chosen region
         
@@ -34,37 +16,30 @@ def create_bucket(bucket_name, KEY, SECRET, region=None):
         Returns:
             s3_client upon creation, exit otherwise
     """
+    try:
+        aws_hook = AwsHook(self.aws_credentials_id)
+        credentials = aws_hook.get_credentials()
+    except Exception:
+
     ## Creating the bucket 
     try:
         if region is None:
             s3_client = boto3.client('s3', 
-                                     aws_access_key_id=KEY,
-                                     aws_secret_access_key=SECRET)
+                                     aws_access_key_id=credentials.access_key,
+                                     aws_secret_access_key=credentials.secret_key)
             s3_client.create_bucket(Bucket=bucket_name)
         else:
             s3_client = boto3.client('s3', 
                                      region_name=region,
-                                     aws_access_key_id=KEY,
-                                     aws_secret_access_key=SECRET)
+                                     aws_access_key_id=credentials.access_key,
+                                     aws_secret_access_key=credentials.secret_key)
             location = {'LocationConstraint': region}
             s3_client.create_bucket(Bucket=bucket_name,
-                                    CreateBucketConfiguration=location)           
+                                    CreateBucketConfiguration=location)
+        logging.info('Successfully created S3 bucket')
     except ClientError as e:
+        logging.error('Could not create S3 bucket')
         logging.error(e)
-        print('Could not create S3 bucket')
         exit()
-        
-    print('************************************')
-    print('S3 Client created')
-    print('************************************')
-    return s3_client
 
-
-if __name__ == '__main__':
-    
-    KEY, SECRET = get_key_secret()
-    
-    s3_client = create_bucket('spark-bucket-cornisto',
-                              KEY,
-                              SECRET)
     
