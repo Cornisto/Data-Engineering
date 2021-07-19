@@ -15,7 +15,7 @@ class DataQualityOperator(BaseOperator):
 
         super(DataQualityOperator, self).__init__(*args, **kwargs)
         self.redshift_conn_id = redshift_conn_id
-        if dq_checks == None:
+        if dq_checks is None:
             self.dq_checks = []
         else:
             self.dq_checks = dq_checks

@@ -7,7 +7,7 @@ from airflow.contrib.hooks.aws_hook import AwsHook
 class StageToRedshiftOperator(BaseOperator):
     ui_color = '#358140'
     template_fields = ("s3_key",)
-    
+
     @apply_defaults
     def __init__(self,
                  redshift_conn_id="",
@@ -33,24 +33,22 @@ class StageToRedshiftOperator(BaseOperator):
         self.delimiter = delimiter
         self.ignore_headers = ignore_headers
         self.file_type = file_type
-        
-    
+
     def execute(self, context):
         aws_hook = AwsHook(self.aws_credentials_id)
         credentials = aws_hook.get_credentials()
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
-        
+
         self.log.info(f"Creating table if not exists: {self.table}")
         redshift.run(self.create_stmt)
-        
+
         self.log.info(f"Clearing data from destination Redshift table {self.table}")
         redshift.run("DELETE FROM {}".format(self.table))
-        
+
         self.log.info(f"Copying data from S3 to Redshift table {self.table}")
         rendered_key = self.s3_key.format(**context)
         s3_path = "s3://{}/{}".format(self.s3_bucket, rendered_key)
-        
-        
+
         if self.file_type == "csv":
             sql = f"""
                 COPY {self.table}
@@ -72,8 +70,3 @@ class StageToRedshiftOperator(BaseOperator):
             """
 
         redshift.run(sql)
-        
-
-
-
-
