@@ -1,14 +1,19 @@
 from string import ascii_lowercase
 import scrapy
 from scrapy.crawler import CrawlerProcess
-import json
 
 
 class FighterInfoSpider(scrapy.Spider):
     name = 'fighter_info'
 
+    custom_settings = {
+        "FEEDS": {
+            "ufc_data/fighters.json": {"format": "json"}
+        }
+    }
+
     def start_requests(self):
-        urls = [f'http://www.ufcstats.com/statistics/fighters?char={letter}&page=all' for letter in ascii_lowercase]
+        urls = [f'http://www.ufcstats.com/statistics/fighters?char={letter}&page=all' for letter in ascii_lowercase[0]]
 
         for url in urls:
             yield scrapy.Request(url=url, callback=self.parse)
@@ -22,16 +27,14 @@ class FighterInfoSpider(scrapy.Spider):
             yield scrapy.Request(profile_url, callback=self.parse_fighter_info, meta={'request_url': profile_url})
 
     def parse_fighter_info(self, response):
-        fighter_info = {}
-        request_url = response.meta.get('request_url')
-        fighter_name = response.css('h2[class=b-content__title] '
-                                    'span[class=b-content__title-highlight]::text').extract_first().strip()
-        fighter_info['fighter_name'] = fighter_name
-        fighter_info['fighter_record'] = response.css(
-            'h2[class=b-content__title] span[class=b-content__title-record]::text').extract_first().strip()
-        fighter_info['fighter_nickname'] = response.css('p[class=b-content__Nickname]::text').extract_first().strip()
-        fighter_hash = request_url[request_url.rfind('/') + 1:]
-        fighter_info['fighter_hash'] = fighter_hash
+        fighter_info = {'profile_url': response.meta.get('request_url'),
+                        'fighter_name': response.css('h2[class=b-content__title] '
+                                                     'span[class=b-content__title-highlight]::text').extract_first().strip(),
+                        'fighter_record': response.css('h2[class=b-content__title] '
+                                                       'span[class=b-content__title-record]::text').extract_first().strip(),
+                        'fighter_nickname': response.css('p[class=b-content__Nickname]::text').extract_first().strip()
+                        }
+
         for stat in response.css('ul[class=b-list__box-list] li'):
             stat_name = stat.css('i::text').extract_first().strip().replace(':', '').lower()
             stat_values = [stat_val.strip() for stat_val in stat.css('*::text').extract() if
@@ -39,15 +42,17 @@ class FighterInfoSpider(scrapy.Spider):
             stat_value = stat_values[0] if stat_values else ''
             fighter_info[stat_name] = stat_value
 
-        with open(f'fighters_data/{fighter_name}.json', 'w+') as json_file:
-            json.dump(fighter_info, json_file)
-            json_file.close()
-
-        self.log(f'Collected data for {fighter_name}')
+        yield fighter_info
 
 
 class EventsInfoSpider(scrapy.Spider):
     name = 'events_info'
+
+    custom_settings = {
+        "FEEDS": {
+            "ufc_data/events.json": {"format": "json"}
+        }
+    }
 
     def start_requests(self):
         url = 'http://www.ufcstats.com/statistics/events/completed?page=all'
@@ -59,7 +64,7 @@ class EventsInfoSpider(scrapy.Spider):
                                     'tr[@class="b-statistics__table-row"]/td[@class="b-statistics__table-col"]/'
                                     'i[@class="b-statistics__table-content"]/a/@href').getall()
 
-        for url in event_urls:
+        for url in event_urls[:10]:
             self.log(f'Processing data for event: {url}')
             yield scrapy.Request(url, callback=self.parse_event_info, meta={'request_url': url})
 
@@ -84,11 +89,7 @@ class EventsInfoSpider(scrapy.Spider):
 
 if __name__ == "__main__":
 
-    process = CrawlerProcess(settings={
-        "FEEDS": {
-            "events_data/events.json": {"format": "json"},
-        },
-    })
-    # process.crawl(FighterInfoSpider)
+    process = CrawlerProcess()
     process.crawl(EventsInfoSpider)
+    process.crawl(FighterInfoSpider)
     process.start()
