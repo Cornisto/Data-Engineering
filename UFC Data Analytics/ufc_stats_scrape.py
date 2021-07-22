@@ -64,7 +64,7 @@ class EventsInfoSpider(scrapy.Spider):
                                     'tr[@class="b-statistics__table-row"]/td[@class="b-statistics__table-col"]/'
                                     'i[@class="b-statistics__table-content"]/a/@href').getall()
 
-        for url in event_urls:
+        for url in event_urls[:3]:
             self.log(f'Processing data for event: {url}')
             yield scrapy.Request(url, callback=self.parse_event_info, meta={'request_url': url})
 
@@ -84,12 +84,37 @@ class EventsInfoSpider(scrapy.Spider):
             info_value = info_values[0] if info_values else ''
             event_info[info_name] = info_value
 
-        yield event_info
+        for fight_url in response.xpath('//tr[@class="b-fight-details__table-row b-fight-details__table-row__hover js-fight-details-click"]/@data-link').extract():
+
+            yield scrapy.Request(fight_url, callback=self.parse_fight_info, meta={'fight_info': event_info,
+                                                                                  'fight_url': fight_url})
+
+    def parse_fight_info(self, response):
+
+        fight_info = response.meta.get('fight_info')
+        fight_info['fight_url'] = response.meta.get('fight_url')
+
+        fighters_info = {}
+
+        for fighter in response.xpath('//div[@class="b-fight-details__person"]'):
+            fighter_name = fighter.xpath('.//div[@class="b-fight-details__person-text"]/h3/a/text()').extract_first().strip()
+            fighters_info[fighter_name] = {'profile_url': fighter.xpath('.//div[@class="b-fight-details__person-text"]/h3/a/@href').extract_first().strip(),
+                                           'result': fighter.xpath('.//i/text()').extract_first().strip()
+                                           }
+
+        fight_info['bout'] = response.xpath('//i[@class="b-fight-details__fight-title"]/text()').extract_first().strip()
+
+        for stat in response.xpath('//div[@class="b-fight-details__content"]/p/i'):
+            stat_name = stat.xpath('.//i/text()').extract_first().replace(':', '').strip().lower()
+            stat_value = stat.xpath('.//i/following-sibling::text()').extract_first().strip()
+            if stat_value == '':
+                stat_value = stat.xpath('.//i/following-sibling::node()/text()').extract_first().strip()
+            fight_info[stat_name] = stat_value
 
 
 if __name__ == "__main__":
 
     process = CrawlerProcess()
     process.crawl(EventsInfoSpider)
-    process.crawl(FighterInfoSpider)
+    #process.crawl(FighterInfoSpider)
     process.start()
