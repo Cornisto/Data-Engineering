@@ -13,7 +13,7 @@ class FighterInfoSpider(scrapy.Spider):
     }
 
     def start_requests(self):
-        urls = [f'http://www.ufcstats.com/statistics/fighters?char={letter}&page=all' for letter in ascii_lowercase[0]]
+        urls = [f'http://www.ufcstats.com/statistics/fighters?char={letter}&page=all' for letter in ascii_lowercase]
 
         for url in urls:
             yield scrapy.Request(url=url, callback=self.parse)
@@ -64,7 +64,7 @@ class EventsInfoSpider(scrapy.Spider):
                                     'tr[@class="b-statistics__table-row"]/td[@class="b-statistics__table-col"]/'
                                     'i[@class="b-statistics__table-content"]/a/@href').getall()
 
-        for url in event_urls[:10]:
+        for url in event_urls:
             self.log(f'Processing data for event: {url}')
             yield scrapy.Request(url, callback=self.parse_event_info, meta={'request_url': url})
 
