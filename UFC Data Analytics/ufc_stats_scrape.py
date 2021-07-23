@@ -64,7 +64,7 @@ class EventsInfoSpider(scrapy.Spider):
                                     'tr[@class="b-statistics__table-row"]/td[@class="b-statistics__table-col"]/'
                                     'i[@class="b-statistics__table-content"]/a/@href').getall()
 
-        for url in event_urls[:3]:
+        for url in event_urls[2:4]:
             self.log(f'Processing data for event: {url}')
             yield scrapy.Request(url, callback=self.parse_event_info, meta={'request_url': url})
 
@@ -84,8 +84,8 @@ class EventsInfoSpider(scrapy.Spider):
             info_value = info_values[0] if info_values else ''
             event_info[info_name] = info_value
 
-        for fight_url in response.xpath('//tr[@class="b-fight-details__table-row b-fight-details__table-row__hover js-fight-details-click"]/@data-link').extract():
-
+        for fight_url in response.xpath('//tr[@class="b-fight-details__table-row b-fight-details__table-row__hover js-fight-details-click"]'
+                                        '/@data-link').extract()[:3]:
             yield scrapy.Request(fight_url, callback=self.parse_fight_info, meta={'fight_info': event_info,
                                                                                   'fight_url': fight_url})
 
@@ -95,26 +95,84 @@ class EventsInfoSpider(scrapy.Spider):
         fight_info['fight_url'] = response.meta.get('fight_url')
 
         fighters_info = {}
+        fighters = [None, None]
 
         for fighter in response.xpath('//div[@class="b-fight-details__person"]'):
-            fighter_name = fighter.xpath('.//div[@class="b-fight-details__person-text"]/h3/a/text()').extract_first().strip()
-            fighters_info[fighter_name] = {'profile_url': fighter.xpath('.//div[@class="b-fight-details__person-text"]/h3/a/@href').extract_first().strip(),
+            fighter_name = fighter.xpath(
+                './/div[@class="b-fight-details__person-text"]/h3/a/text()').extract_first().strip()
+            fighters_info[fighter_name] = {'profile_url': fighter.xpath(
+                './/div[@class="b-fight-details__person-text"]/h3/a/@href').extract_first().strip(),
                                            'result': fighter.xpath('.//i/text()').extract_first().strip()
                                            }
+            fighters[1] = fighter_name
+
+        fighters[0] = [fighter for fighter in fighters_info.keys() if fighter != fighters[1]][0]
 
         fight_info['bout'] = response.xpath('//i[@class="b-fight-details__fight-title"]/text()').extract_first().strip()
 
+        stat_names = [s.replace(':', '').strip().lower() for s in
+                      response.xpath('//div[@class="b-fight-details__content"]'
+                                     '/p/i/i[@class="b-fight-details__label"]/text()').extract()]
+
+        stat_values = []
         for stat in response.xpath('//div[@class="b-fight-details__content"]/p/i'):
-            stat_name = stat.xpath('.//i/text()').extract_first().replace(':', '').strip().lower()
-            stat_value = stat.xpath('.//i/following-sibling::text()').extract_first().strip()
+            stat_value = ''
+            try:
+                stat_value = stat.xpath('.//i/following-sibling::text()').extract_first().strip()
+            except AttributeError:
+                pass
             if stat_value == '':
-                stat_value = stat.xpath('.//i/following-sibling::node()/text()').extract_first().strip()
-            fight_info[stat_name] = stat_value
+                try:
+                    stat_value = stat.xpath('.//i/following-sibling::node()/text()').extract_first().strip()
+                except AttributeError:
+                    stat_vals = [stat_val.strip() for stat_val in
+                                   stat.xpath('.//ancestor::node()[1]/text()').extract()
+                                   if stat_val.strip().replace(':', '').lower() not in stat_names and stat_val.strip() != '']
+                    if stat_vals:
+                        stat_value = stat_vals[0]
+                    else:
+                        stat_value = ', '.join([stat_val.strip() for stat_val in stat.xpath('./following-sibling::node()/text()').extract()
+                                                if stat_val.strip() != '' and stat_val.strip() not in stat_values]).replace('.', '')
+            stat_values.append(stat_value)
+
+        for i in range(len(stat_names)):
+            fight_info[stat_names[i]] = stat_values[i]
+
+        stat_headers = []
+        for header_tbl in response.xpath('//table[not (@class)]'):
+            headers = [header.strip().lower().replace('.', ' ') for header in
+                       header_tbl.xpath('.//thead[@class="b-fight-details__table-head"]'
+                                        '/tr/th[@class="b-fight-details__table-col"]/text()').extract() if header.strip() != '']
+            stat_headers.append(headers)
+
+        stat_tables = response.xpath('//section[@class="b-fight-details__section js-fight-section"]/table[@class="b-fight-details__table js-fight-table"]')
+        round_headers = stat_tables[0].xpath('.//thead[@class="b-fight-details__table-row b-fight-details__table-row_type_head"]')
+        rounds = [rnd.strip() for rnd in round_headers.xpath('.//th/text()|.//tr/th/text()').extract()]
+
+        for rnd in rounds:
+            fighters_info[fighters[0]][rnd] = {}
+            fighters_info[fighters[1]][rnd] = {}
+
+        table_num = 0
+        for stat_tbl in response.xpath('//section[@class="b-fight-details__section js-fight-section"]/table[@class="b-fight-details__table js-fight-table"]'):
+            round_num = 0
+            for rnd in stat_tbl.xpath('.//tbody'):
+                round_stats = rnd.xpath('.//tr[@class="b-fight-details__table-row"]/td[@class="b-fight-details__table-col"]')
+                stat_num = 0
+                for stat in round_stats:
+                    fighters_stats = stat.xpath('.//p/text()').extract()
+                    for i in range(len(fighters_stats)):
+                        fighters_info[fighters[i]][rounds[round_num]][stat_headers[table_num][stat_num]] = fighters_stats[i].strip()
+                    stat_num += 1
+                round_num += 1
+                print(round_stats)
+            table_num += 1
+
+        print(fighters_info)
 
 
 if __name__ == "__main__":
-
     process = CrawlerProcess()
     process.crawl(EventsInfoSpider)
-    #process.crawl(FighterInfoSpider)
+    # process.crawl(FighterInfoSpider)
     process.start()
