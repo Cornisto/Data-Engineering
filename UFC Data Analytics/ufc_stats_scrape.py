@@ -64,7 +64,7 @@ class EventsInfoSpider(scrapy.Spider):
                                     'tr[@class="b-statistics__table-row"]/td[@class="b-statistics__table-col"]/'
                                     'i[@class="b-statistics__table-content"]/a/@href').getall()
 
-        for url in event_urls[2:4]:
+        for url in event_urls:
             self.log(f'Processing data for event: {url}')
             yield scrapy.Request(url, callback=self.parse_event_info, meta={'request_url': url})
 
@@ -73,8 +73,9 @@ class EventsInfoSpider(scrapy.Spider):
         request_url = response.meta.get('request_url')
 
         event_info = {'event_url': request_url,
-                      'event_name': response.xpath('//h2[@class="b-content__title"]/span['
-                                                   '@class="b-content__title-highlight"]/text()').extract_first().strip()
+                      'event_name': response.xpath('//h2[@class="b-content__title"]/'
+                                                   'span[@class="b-content__title-highlight"]'
+                                                   '/text()').extract_first().strip()
                       }
 
         for info in response.xpath('//ul[@class="b-list__box-list"]/li[@class="b-list__box-list-item"]'):
@@ -85,7 +86,7 @@ class EventsInfoSpider(scrapy.Spider):
             event_info[info_name] = info_value
 
         for fight_url in response.xpath('//tr[@class="b-fight-details__table-row b-fight-details__table-row__hover js-fight-details-click"]'
-                                        '/@data-link').extract()[:3]:
+                                        '/@data-link').extract():
             yield scrapy.Request(fight_url, callback=self.parse_fight_info, meta={'fight_info': event_info,
                                                                                   'fight_url': fight_url})
 
@@ -115,6 +116,7 @@ class EventsInfoSpider(scrapy.Spider):
                                      '/p/i/i[@class="b-fight-details__label"]/text()').extract()]
 
         stat_values = []
+
         for stat in response.xpath('//div[@class="b-fight-details__content"]/p/i'):
             stat_value = ''
             try:
@@ -135,17 +137,21 @@ class EventsInfoSpider(scrapy.Spider):
                                                 if stat_val.strip() != '' and stat_val.strip() not in stat_values]).replace('.', '')
             stat_values.append(stat_value)
 
+            if len(stat_values) == len(stat_names):
+                break
+
         for i in range(len(stat_names)):
             fight_info[stat_names[i]] = stat_values[i]
 
         stat_headers = []
         for header_tbl in response.xpath('//table[not (@class)]'):
-            headers = [header.strip().lower().replace('.', ' ') for header in
+            headers = [header.replace('.', ' ').strip().lower() for header in
                        header_tbl.xpath('.//thead[@class="b-fight-details__table-head"]'
                                         '/tr/th[@class="b-fight-details__table-col"]/text()').extract() if header.strip() != '']
             stat_headers.append(headers)
 
-        stat_tables = response.xpath('//section[@class="b-fight-details__section js-fight-section"]/table[@class="b-fight-details__table js-fight-table"]')
+        stat_tables = response.xpath('//section[@class="b-fight-details__section js-fight-section"]/'
+                                     'table[@class="b-fight-details__table js-fight-table"]')
         round_headers = stat_tables[0].xpath('.//thead[@class="b-fight-details__table-row b-fight-details__table-row_type_head"]')
         rounds = [rnd.strip() for rnd in round_headers.xpath('.//th/text()|.//tr/th/text()').extract()]
 
@@ -156,23 +162,23 @@ class EventsInfoSpider(scrapy.Spider):
         table_num = 0
         for stat_tbl in response.xpath('//section[@class="b-fight-details__section js-fight-section"]/table[@class="b-fight-details__table js-fight-table"]'):
             round_num = 0
-            for rnd in stat_tbl.xpath('.//tbody'):
-                round_stats = rnd.xpath('.//tr[@class="b-fight-details__table-row"]/td[@class="b-fight-details__table-col"]')
-                stat_num = 0
-                for stat in round_stats:
-                    fighters_stats = stat.xpath('.//p/text()').extract()
-                    for i in range(len(fighters_stats)):
-                        fighters_info[fighters[i]][rounds[round_num]][stat_headers[table_num][stat_num]] = fighters_stats[i].strip()
-                    stat_num += 1
-                round_num += 1
-                print(round_stats)
+            stat_num = 0
+            for round_stats in stat_tbl.xpath('.//tbody/tr[@class="b-fight-details__table-row"]/td[@class="b-fight-details__table-col"]'):
+                fighters_stats = round_stats.xpath('.//p/text()').extract()
+                for i in range(len(fighters_stats)):
+                    fighters_info[fighters[i]][rounds[round_num]][stat_headers[table_num][stat_num]] = fighters_stats[i].strip()
+                stat_num += 1
+                if stat_num == len(stat_headers[table_num]):
+                    round_num += 1
+                    stat_num = 0
             table_num += 1
 
-        print(fighters_info)
+        fight_info['fighters_stats'] = fighters_info
+        yield fight_info
 
 
 if __name__ == "__main__":
     process = CrawlerProcess()
     process.crawl(EventsInfoSpider)
-    # process.crawl(FighterInfoSpider)
+    process.crawl(FighterInfoSpider)
     process.start()
