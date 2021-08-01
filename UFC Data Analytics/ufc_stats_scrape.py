@@ -1,6 +1,7 @@
 from string import ascii_lowercase
 import scrapy
 from scrapy.crawler import CrawlerProcess
+import json
 
 
 class FighterInfoSpider(scrapy.Spider):
@@ -47,12 +48,6 @@ class FighterInfoSpider(scrapy.Spider):
 
 class EventsInfoSpider(scrapy.Spider):
     name = 'events_info'
-
-    custom_settings = {
-        "FEEDS": {
-            "ufc_data/events.json": {"format": "json"}
-        }
-    }
 
     def start_requests(self):
         url = 'http://www.ufcstats.com/statistics/events/completed?page=all'
@@ -153,12 +148,7 @@ class EventsInfoSpider(scrapy.Spider):
         stat_tables = response.xpath('//section[@class="b-fight-details__section js-fight-section"]/'
                                      'table[@class="b-fight-details__table js-fight-table"]')
         round_headers = stat_tables[0].xpath('.//thead[@class="b-fight-details__table-row b-fight-details__table-row_type_head"]')
-        rounds = [rnd.strip() for rnd in round_headers.xpath('.//th/text()|.//tr/th/text()').extract()]
-
-        for rnd in rounds:
-            fighters_info[fighters[0]][rnd] = {}
-            fighters_info[fighters[1]][rnd] = {}
-
+        
         table_num = 0
         for stat_tbl in response.xpath('//section[@class="b-fight-details__section js-fight-section"]/table[@class="b-fight-details__table js-fight-table"]'):
             round_num = 0
@@ -166,15 +156,19 @@ class EventsInfoSpider(scrapy.Spider):
             for round_stats in stat_tbl.xpath('.//tbody/tr[@class="b-fight-details__table-row"]/td[@class="b-fight-details__table-col"]'):
                 fighters_stats = round_stats.xpath('.//p/text()').extract()
                 for i in range(len(fighters_stats)):
-                    fighters_info[fighters[i]][rounds[round_num]][stat_headers[table_num][stat_num]] = fighters_stats[i].strip()
+                    fighters_info[fighters[i]][stat_headers[table_num][stat_num]] = fighters_stats[i].strip()
                 stat_num += 1
                 if stat_num == len(stat_headers[table_num]):
+                    fighters_info[fighters[0]]['round'] = round_num + 1
+                    fighters_info[fighters[1]]['round'] = round_num + 1
+                    with open('ufc_data/events.json', 'a+') as f:
+                        json.dump({**fight_info, **fighters_info[fighters[0]]}, f)
+                        f.write(',\n')
+                        json.dump({**fight_info, **fighters_info[fighters[1]]}, f)
+                        f.write(',\n')
                     round_num += 1
                     stat_num = 0
             table_num += 1
-
-        fight_info['fighters_stats'] = fighters_info
-        yield fight_info
 
 
 if __name__ == "__main__":
