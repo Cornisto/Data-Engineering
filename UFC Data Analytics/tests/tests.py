@@ -25,5 +25,21 @@ class TestHeightConverter(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class TestInchConverter(unittest.TestCase):
+    def test_inches_valid(self):
+        """
+        Test if valid height input with feet and inches provided is extracted and converted into cm
+        """
+        result = inch_to_cm("72\"")
+        self.assertEqual(result, 183)
+
+    def test_inches_invalid_input(self):
+        """
+        Test if height input without inches is extracted and converted into cm
+        """
+        result = inch_to_cm("--")
+        self.assertIsNone(result)
+
+
 if __name__ == '__main__':
     unittest.main()
